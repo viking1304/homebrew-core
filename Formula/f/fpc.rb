@@ -30,6 +30,15 @@ class Fpc < Formula
     sha256 cellar: :any_skip_relocation, x86_64_linux:   "3491933cdf5782d3c4b9b1188757cb3846b5d823a6db75c8fb56f13b23bc6747"
   end
 
+  head do
+    url "https://gitlab.com/freepascal.org/fpc/source.git", branch: "main"
+
+    resource "bootstrap" do
+      url "https://github.com/viking1304/fpc-bootstrap/releases/download/v3.3.1/fpc-3.3.1-bootstrap-aarch64-macosx.dmg"
+      sha256 "05d40ce948dec8d7132d0a5590100fec0ec1716cb2a8f758edd13d62a045cdb0"
+    end
+  end
+
   # mesa is needed to test GL unit
   on_linux do
     depends_on "mesa" => :test
@@ -62,25 +71,32 @@ class Fpc < Formula
   end
 
   def install
-    fpc_bootstrap = buildpath/"bootstrap"
     compiler_name = Hardware::CPU.arm? ? "ppca64" : "ppcx64"
+
+    fpc_bootstrap = buildpath/"bootstrap"
     fpc_compiler = fpc_bootstrap/"bin"/compiler_name
-
-    resource("bootstrap").stage do
-      if OS.mac?
-        pkg_path = "fpc-3.2.2-intelarm64-macosx.mpkg/Contents/Packages/fpc-3.2.2-intelarm64-macosx.pkg"
-        system "pkgutil", "--expand-full", pkg_path, "contents"
+    if build.head?
+      resource("bootstrap").stage do
+        system "pkgutil", "--expand-full", "fpc-3.3.1-bootstrap-aarch64-macosx.pkg", "contents"
         fpc_bootstrap.install Dir["contents/Payload/usr/local/*"]
-      else
-        arch = Hardware::CPU.arm? ? "aarch64" : Hardware::CPU.arch.to_s
-        mkdir "packages"
-        system "tar", "-xf", "binary.#{arch}-linux.tar", "-C", "packages"
-        mkdir_p fpc_bootstrap
-        Dir["packages/*.tar.gz"].each do |tarball|
-          system "tar", "-xzf", tarball, "-C", fpc_bootstrap
-        end
+      end
+    else
+      resource("bootstrap").stage do
+        if OS.mac?
+          pkg_path = "fpc-3.2.2-intelarm64-macosx.mpkg/Contents/Packages/fpc-3.2.2-intelarm64-macosx.pkg"
+          system "pkgutil", "--expand-full", pkg_path, "contents"
+          fpc_bootstrap.install Dir["contents/Payload/usr/local/*"]
+        else
+          arch = Hardware::CPU.arm? ? "aarch64" : Hardware::CPU.arch.to_s
+          mkdir "packages"
+          system "tar", "-xf", "binary.#{arch}-linux.tar", "-C", "packages"
+          mkdir_p fpc_bootstrap
+          Dir["packages/*.tar.gz"].each do |tarball|
+            system "tar", "-xzf", tarball, "-C", fpc_bootstrap
+          end
 
-        (fpc_bootstrap/"bin").install_symlink fpc_bootstrap/"lib/fpc/3.2.2"/compiler_name
+          (fpc_bootstrap/"bin").install_symlink fpc_bootstrap/"lib/fpc/3.2.2"/compiler_name
+        end
       end
     end
 
